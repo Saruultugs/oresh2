@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Barcode Detector API with Print</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    video {
+      width: 100%;
+      max-width: 500px;
+      border: 2px solid black;
+    }
+
+    #result {
+      margin-top: 10px;
+      font-size: 1.2em;
+    }
+
+    #printArea {
+      display: none;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printArea, #printArea * {
+        visibility: visible;
+      }
+      #printArea {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h2>Scan a Barcode</h2>
+<video id="video" autoplay></video>
+<p id="result">Waiting for barcode...</p>
+
+<div id="printArea">
+  <h2>Product Info</h2>
+  <p id="printName"></p>
+  <p id="printPrice"></p>
+</div>
+
+<script>
+  const database = [
+    { barcode: "123456789012", name: "Apple Juice", price: "$2.99" },
+    { barcode: "987654321098", name: "Orange Soda", price: "$1.99" }
+  ];
+
+  const video = document.getElementById('video');
+  const resultEl = document.getElementById('result');
+  const printName = document.getElementById('printName');
+  const printPrice = document.getElementById('printPrice');
+
+  let lastScanned = "";
+
+  async function startScanner() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      video.srcObject = stream;
+
+      if (!('BarcodeDetector' in window)) {
+        resultEl.textContent = "Barcode Detection API is not supported in this browser.";
+        return;
+      }
+
+      const detector = new BarcodeDetector({
+        formats: ["qr_code", "ean_13", "code_128", "upc_a", "code_39"]
+      });
+
+      const detectLoop = async () => {
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0) {
+          const code = barcodes[0].rawValue;
+          if (code !== lastScanned) {
+            lastScanned = code;
+            const match = database.find(item => item.barcode === code);
+            if (match) {
+              resultEl.textContent = `Found: ${match.name} - ${match.price}`;
+              printName.textContent = `Name: ${match.name}`;
+              printPrice.textContent = `Price: ${match.price}`;
+              setTimeout(() => window.print(), 500);
+            } else {
+              resultEl.textContent = `Barcode detected, but no match found: ${code}`;
+            }
+          }
+        }
+        requestAnimationFrame(detectLoop);
+      };
+
+      detectLoop();
+
+    } catch (err) {
+      console.error('Camera error:', err);
+      resultEl.textContent = "Could not access camera.";
+    }
+  }
+
+  startScanner();
+</script>
+
+</body>
+</html>
